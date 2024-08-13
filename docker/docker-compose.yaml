@@ -1,8 +1,8 @@
 version: "3"
 
 services:
-  ml_deep:
-    container_name: ml_deep
+  image_processing:
+    container_name: image_processing
     build:
       context: .
       args:
@@ -16,10 +16,10 @@ services:
         - PYTHON_VERSION=${PYTHON_VERSION}
         - CUDA_VERSION=${CUDA_VERSION}
       dockerfile: Dockerfile
-    image: n622jwith/ml_deep:latest
+    image: n622jwith/image_processing:latest
     # ホストの22番ポートは使用できないので、10000番ポートを使用する(22にアクセスするとkey errorが発生する)
     ports:
-      - "10000:22"
+      - "10001:22"
     # これは必要ないかもしれない
     platform: "linux/amd64"
     environment:
@@ -29,7 +29,7 @@ services:
       - /tmp/.X11-unix:/tmp/.X11-unix
       - $HOME/.Xauthority/:/home/${USER_NAME}/.Xauthority:ro
       - $HOME/.ssh:/home/${USER_NAME}/.ssh:ro
-    hostname: ml_deep
+    hostname: image_processing
     deploy:
       resources:
         reservations:
