@@ -4,7 +4,7 @@ from ultralytics import YOLO
 model = YOLO(
     "/home/kousei/image_proccessing/source/yolo/runs/detect/train3/weights/best.pt"
 )  # best.ptまでの相対パス
-video_path = "./path_to_video/video_name.mp4"  # テストしたい動画
+video_path = "/home/kousei/image_proccessing/source/yolo/test/MOV_0781.mp4"  # テストしたい動画
 cap = cv2.VideoCapture(video_path)
 annotated_frames = []
 while cap.isOpened():  # フレームがある間繰り返す
