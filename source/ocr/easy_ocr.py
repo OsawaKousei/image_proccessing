@@ -1,3 +1,5 @@
+from typing import Any
+
 import easyocr
 from PIL import Image, ImageDraw
 
@@ -9,7 +11,7 @@ def analyze_picture(target_path: str) -> None:
 
 
 # <追加>入力画像内に文字列の領域を赤枠で囲う
-def draw_chararea(target_path: str, results) -> None:
+def draw_chararea(target_path: str, results: Any) -> None:
     image = Image.open(target_path).convert("RGB")
     draw = ImageDraw.Draw(image)
     # 座標情報からテキスト領域を四角で囲う
@@ -21,5 +23,5 @@ def draw_chararea(target_path: str, results) -> None:
 
 
 if __name__ == "__main__":
-    target_path = "/home/kousei/image_proccessing/confidencial/text.jpg"
+    target_path = "/home/kousei/image_proccessing/confidencial/binary.jpg"
     analyze_picture(target_path)
