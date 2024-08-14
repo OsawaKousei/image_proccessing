@@ -1,0 +1,10 @@
+# .pt
+*.pt
+
+*.txt
+*.jpg
+*.png
+
+/confidential
+
+*/data

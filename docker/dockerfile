@@ -1,0 +1,151 @@
+# base image from specific CUDA version
+ARG CUDA_VERSION
+
+# refer from : https://hub.docker.com/r/nvidia/cuda/tags
+# please confirm base image tag name from above URL
+FROM nvidia/cuda:${CUDA_VERSION}-cudnn8-devel-ubuntu22.04
+
+# Upgrade OS
+RUN apt-get update -q && \
+    DEBIAN_FRONTEND=noninteractive apt-get upgrade -y && \
+    apt-get autoclean && \
+    apt-get autoremove && \
+    rm -rf /var/lib/apt/lists/*
+
+# Setting timezone, launguage
+RUN apt-get update &&\
+    apt-get install -y --no-install-recommends locales &&\
+    #  Add locale configuration to prevent build from stopping
+    ln -sf /usr/share/zoneinfo/Asia/Tokyo /etc/localtime &&\
+    apt install -y --no-install-recommends \
+    software-properties-common tzdata &&\
+    locale-gen ja_JP ja_JP.UTF-8 &&\
+    update-locale LC_ALL=ja_JP.UTF-8 LANG=ja_JP.UTF-8 &&\
+    add-apt-repository universe
+
+ENV LANG=ja_JP.UTF-8
+ENV TZ=Asia/Tokyo
+
+# Set root password
+RUN echo 'root:root' | chpasswd
+
+# Install basic packages
+RUN apt-get update \
+    && apt-get install -y \
+    git \
+    git-lfs \
+    curl \
+    wget \
+    build-essential \
+    zlib1g-dev \
+    libncurses5-dev \
+    libgdbm-dev \
+    libbz2-dev \
+    libnss3-dev \
+    libsqlite3-dev \
+    libssl-dev \
+    liblzma-dev \
+    libreadline-dev \
+    libffi-dev \
+    libgl1-mesa-dev \
+    nano \
+    iputils-ping \
+    net-tools \
+    software-properties-common \
+    fonts-powerline \
+    sudo && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install pkgs for PyQt5
+RUN apt-get update && \
+    apt-get install -y \
+    libxkbcommon-x11-0 \
+    libxcb-xinerama0 \
+    libxcb-icccm4 \
+    libxcb-image0 \
+    libxcb-keysyms1 \
+    libxcb-randr0 \
+    libxcb-render-util0 \
+    libxcb-shape0 \
+    libxcb-shm0 \
+    libxcb-sync1 \
+    libxcb-xfixes0 \
+    libxcb-xinput0 \
+    libxcb-xkb1 \
+    libxcb-xrm0 && \
+    rm -rf /var/lib/apt/lists/*
+
+# Add user and group, then allow sudo
+ARG UID
+ARG GID
+ARG PASSWORD
+ARG USER_NAME
+ARG GROUP_NAME
+ARG GIT_USER_NAME
+ARG GIT_USER_EMAIL
+
+RUN groupadd -g ${GID} ${GROUP_NAME}
+RUN useradd -u ${UID} -g ${GID} -G sudo -s /bin/bash -m ${USER_NAME}
+RUN echo "${USER_NAME}:${PASSWORD}" | chpasswd
+RUN echo "Defaults visiblepw" >> /etc/sudoers
+RUN echo "${USER_NAME} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+# Switch to user
+USER ${USER_NAME}
+
+# Install pyenv and set python version
+ENV HOME /home/${USER_NAME}
+ENV PYENV_ROOT $HOME/.pyenv
+ENV PATH $PYENV_ROOT/bin:$PATH
+
+# 仮想環境の準備
+RUN git clone https://github.com/pyenv/pyenv.git ~/.pyenv && \
+    echo 'eval "$(pyenv init --path)"' >> ~/.bashrc && \
+    echo 'eval "$(pyenv init -)"' >> ~/.bashrc
+ARG PYTHON_VERSION
+RUN pyenv install ${PYTHON_VERSION} && \
+    pyenv global ${PYTHON_VERSION} && \
+    pyenv rehash && \
+    sudo apt-get update &&\
+    sudo apt-get upgrade -y &&\
+    sudo apt-get install -y python3-venv
+
+
+# copy requirements.txt
+COPY requirements.txt /home/${USER_NAME}/requirements.txt
+
+# Install pip and needed pkg
+RUN sudo apt-get update &&\
+    sudo apt-get upgrade -y &&\
+    sudo apt-get install -y python3-pip libcairo2-dev pkg-config
+
+# 仮想環境にライブラリをインストール
+RUN cd /home/${USER_NAME} &&\
+    python3 -m venv venv &&\
+    . venv/bin/activate &&\
+    pip3 install pycairo &&\
+    pip3 install -r requirements.txt
+
+# sshの設定
+RUN sudo apt-get update && sudo apt-get install -y openssh-server
+RUN sudo mkdir /var/run/sshd
+# RUN sudo echo 'root:root' | chpasswd
+RUN sudo sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/g' /etc/ssh/sshd_config
+RUN sudo sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
+# SSH login fix. Otherwise user is kicked off after login
+RUN sudo sed 's@session\s*required\s*pam_loginuid.so@session optional pam_loginuid.so@g' -i /etc/pam.d/sshd
+EXPOSE 22
+
+# Setup.sh
+COPY setup.sh /home/${USER_NAME}/setup.sh
+RUN bash ~/setup.sh
+
+COPY start.sh /start.sh
+RUN sudo chown ${USER_NAME}:${GROUP_NAME} /start.sh
+RUN sudo chmod +x /start.sh
+
+# USER root
+CMD ["/start.sh"]
+
+# CMD ["/usr/sbin/sshd", "-D"]
+# CMD ["/bin/bash"]
