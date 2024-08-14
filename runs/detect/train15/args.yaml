@@ -2,7 +2,7 @@ task: detect
 mode: train
 model: yolov8n.pt
 data: /home/kousei/image_proccessing/source/ocr/data.yaml
-epochs: 300
+epochs: 20
 time: null
 patience: 100
 batch: 20
@@ -13,7 +13,7 @@ cache: false
 device: null
 workers: 8
 project: null
-name: train9
+name: train15
 exist_ok: false
 pretrained: true
 optimizer: auto
@@ -103,4 +103,4 @@ erasing: 0.4
 crop_fraction: 1.0
 cfg: null
 tracker: botsort.yaml
-save_dir: runs/detect/train9
+save_dir: runs/detect/train15

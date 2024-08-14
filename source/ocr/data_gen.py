@@ -4,19 +4,18 @@ import cv2
 import numpy as np
 import pandas as pd
 
-# normalize
-from sklearn.preprocessing import MinMaxScaler
-
 BACKGROUND = "/home/kousei/image_proccessing/source/ocr/free-texture.jpg"
 FONT = cv2.FONT_HERSHEY_SIMPLEX
-FONT_SCALE = 2
+FONT_SCALE = 1
 FONT_THICKNESS = 2
 FONT_COLOR = (255, 255, 255)
 FONT_LINE_TYPE = cv2.LINE_AA
-FONT_MARGIN = 10
-TEXT_X = 50
-TEXT_Y = 150
+TEXT_X = 25
+TEXT_Y = 75
 IMG_PATH = "/home/kousei/image_proccessing/source/ocr/dataset/"
+
+IMG_H = 129
+IMG_W = 192
 
 TRAIN_PATH = "/home/kousei/image_proccessing/source/ocr/train"
 VAILD_PATH = "/home/kousei/image_proccessing/source/ocr/valid"
@@ -36,6 +35,8 @@ class Stamped:
         self.img = cv2.addWeighted(
             self.img, 0.7, np.zeros_like(self.img), 0.7, 0
         )
+        # 解像度を下げる(アスペクト比約3:2)
+        self.img = cv2.resize(self.img, (IMG_W, IMG_H))
         # テキストの挿入
         cv2.putText(
             self.img,
@@ -47,13 +48,43 @@ class Stamped:
             FONT_THICKNESS,
             FONT_LINE_TYPE,
         )
+
         # テキストを囲うバウンディングボックスを取得
         text_size, _ = cv2.getTextSize(text, FONT, FONT_SCALE, FONT_THICKNESS)
         text_w, text_h = text_size
-        text_x = TEXT_X - FONT_MARGIN
-        text_y = TEXT_Y - text_h - FONT_MARGIN
-        text_w += 2 * FONT_MARGIN
-        text_h += 2 * FONT_MARGIN
+        text_x = TEXT_X + text_w // 2
+        text_y = TEXT_Y - text_h // 2
+
+        # テキストとバウンディングボックスの座標を保存
+        self.text = text
+
+        # # テキストとバウンディングボックスをランダムに回転
+        # angle = random.randint(-30, 30)
+        # center = (TEXT_X + text_w // 2, TEXT_Y - text_h // 2)
+        # rot_mat = cv2.getRotationMatrix2D(center, angle, 1.0)
+        # self.img = cv2.warpAffine(
+        #     self.img, rot_mat, (self.img.shape[1], self.img.shape[0])
+        # )
+
+        # # 回転後のバウンディングボックスを算出
+        # rot_mat = cv2.getRotationMatrix2D(center, angle, 1.0)
+        # corners = np.array(
+        #     [
+        #         [text_x, text_y],
+        #         [text_x + text_w, text_y],
+        #         [text_x + text_w, text_y + text_h],
+        #         [text_x, text_y + text_h],
+        #     ],
+        #     dtype=np.float32,
+        # )
+        # corners = np.dot(rot_mat, np.hstack([corners, np.ones((4, 1))]).T).T
+        # corners = corners.reshape(-1, 2).astype(np.int32)
+        # x, y, w, h = cv2.boundingRect(corners)
+
+        # バウンディングボックスの座標を保存
+        x, y, w, h = text_x, text_y, text_w, text_h
+
+        # バウンディングボックスを描画
         # cv2.rectangle(
         #     self.img,
         #     (text_x, text_y),
@@ -62,31 +93,17 @@ class Stamped:
         #     2,
         # )
 
-        # テキストとバウンディングボックスの座標を保存
-        self.text = text
+        # print("raw",x, y, w, h)
 
-        # テキストとバウンディングボックスをランダムに回転
-        angle = random.randint(-30, 30)
-        center = (TEXT_X + text_w // 2, TEXT_Y - text_h // 2)
-        rot_mat = cv2.getRotationMatrix2D(center, angle, 1.0)
-        self.img = cv2.warpAffine(
-            self.img, rot_mat, (self.img.shape[1], self.img.shape[0])
-        )
+        # バウンディングボックスの座標を正規化
+        x = x / IMG_W
+        y = y / IMG_H
+        w = w / IMG_W
+        h = h / IMG_H
 
-        # 回転後のバウンディングボックスを算出
-        rot_mat = cv2.getRotationMatrix2D(center, angle, 1.0)
-        corners = np.array(
-            [
-                [text_x, text_y],
-                [text_x + text_w, text_y],
-                [text_x + text_w, text_y + text_h],
-                [text_x, text_y + text_h],
-            ],
-            dtype=np.float32,
-        )
-        corners = np.dot(rot_mat, np.hstack([corners, np.ones((4, 1))]).T).T
-        corners = corners.reshape(-1, 2).astype(np.int32)
-        x, y, w, h = cv2.boundingRect(corners)
+        # print("normalized",x, y, w, h)
+
+        # print(x, y, w, h)
 
         # labelに追加
         frame = pd.DataFrame(
@@ -95,10 +112,8 @@ class Stamped:
         )
         self.label = pd.concat([self.label, frame])
 
-        # 解像度を下げる(アスペクト比約3:2)
-        self.img = cv2.resize(self.img, (192, 129))
         # ノイズを追加
-        noise = np.random.normal(0, 3, (129, 192, 3))
+        noise = np.random.normal(0, 3, (IMG_H, IMG_W, 3))
         self.img = np.clip(self.img + noise, 0, 255).astype(np.uint8)
         # 画像の保存
         cv2.imwrite(name, self.img)
@@ -132,11 +147,6 @@ class Stamped:
 
         # labelのインデックスを振り直す
         self.label = self.label.reset_index(drop=True)
-        # labelを正規化
-        scaler = MinMaxScaler()
-        self.label[["x", "y", "w", "h"]] = scaler.fit_transform(
-            self.label[["x", "y", "w", "h"]]
-        )
 
         print(self.label.head())
         # yoloのラベルファイルを生成
@@ -163,11 +173,6 @@ class Stamped:
 
         # labelのインデックスを振り直す
         self.label = self.label.reset_index(drop=True)
-        # labelを正規化
-        scaler = MinMaxScaler()
-        self.label[["x", "y", "w", "h"]] = scaler.fit_transform(
-            self.label[["x", "y", "w", "h"]]
-        )
 
         # yoloのラベルファイルを生成
         for i in range(valid_num):
