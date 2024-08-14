@@ -3,5 +3,6 @@
 
 *.txt
 *.jpg
+*.png
 
 /confidential
