@@ -39,7 +39,7 @@ class BaseTransform:
         各色チャネルの標準偏差。
     """
 
-    def __init__(self, resize, mean, std):
+    def __init__(self, resize: int, mean: tuple, std: tuple):
         self.base_transform = transforms.Compose(
             [
                 transforms.Resize(
@@ -53,7 +53,7 @@ class BaseTransform:
             ]
         )
 
-    def __call__(self, img):
+    def __call__(self, img: Image) -> torch.Tensor:
         return self.base_transform(img)
 
 
@@ -94,16 +94,16 @@ class ILSVRCPredictor:
             クラスindexとラベル名を対応させた辞書型変数。
     """
 
-    def __init__(self, class_index):
+    def __init__(self, class_index: dict):
         self.class_index = class_index
 
-    def predict_max(self, out):
+    def predict_max(self, out: torch.Tensor) -> str:
         """
         確率最大のILSVRCのラベル名を取得する。
 
         Parameters
         ----------
-        out : torch.Size([1, 1000])
+        out : torch.Tensor, shape [1, 1000]
             Netからの出力。
 
         Returns
@@ -114,7 +114,7 @@ class ILSVRCPredictor:
         maxid = np.argmax(out.detach().numpy())
         predicted_label_name = self.class_index[str(maxid)][1]
 
-        return predicted_label_name
+        return str(predicted_label_name)
 
 
 # ILSVRCのラベル情報をロードし辞意書型変数を生成します
