@@ -2,6 +2,10 @@ import random
 
 import cv2
 import numpy as np
+import pandas as pd
+
+# normalize
+from sklearn.preprocessing import MinMaxScaler
 
 BACKGROUND = "/home/kousei/image_proccessing/source/ocr/free-texture.jpg"
 FONT = cv2.FONT_HERSHEY_SIMPLEX
@@ -15,13 +19,15 @@ TEXT_Y = 150
 IMG_PATH = "/home/kousei/image_proccessing/source/ocr/dataset/"
 
 TRAIN_PATH = "/home/kousei/image_proccessing/source/ocr/train"
-VAILD_PATH = "/home/kousei/image_proccessing/source/ocr/vaild"
+VAILD_PATH = "/home/kousei/image_proccessing/source/ocr/valid"
 
 
 # アルミの刻印画像を生成するクラス
 class Stamped:
     def __init__(self) -> None:
-        pass
+        self.label = pd.DataFrame(
+            columns=["label", "text", "x", "y", "w", "h"]
+        )
 
     def __draw_text(self, text: str, name: str) -> None:
         # 背景画像の読み込み
@@ -48,20 +54,16 @@ class Stamped:
         text_y = TEXT_Y - text_h - FONT_MARGIN
         text_w += 2 * FONT_MARGIN
         text_h += 2 * FONT_MARGIN
-        cv2.rectangle(
-            self.img,
-            (text_x, text_y),
-            (text_x + text_w, text_y + text_h),
-            (0, 255, 0),
-            2,
-        )
+        # cv2.rectangle(
+        #     self.img,
+        #     (text_x, text_y),
+        #     (text_x + text_w, text_y + text_h),
+        #     (0, 255, 0),
+        #     2,
+        # )
 
         # テキストとバウンディングボックスの座標を保存
         self.text = text
-        self.text_x = text_x
-        self.text_y = text_y
-        self.text_w = text_w
-        self.text_h = text_h
 
         # テキストとバウンディングボックスをランダムに回転
         angle = random.randint(-30, 30)
@@ -85,17 +87,19 @@ class Stamped:
         corners = np.dot(rot_mat, np.hstack([corners, np.ones((4, 1))]).T).T
         corners = corners.reshape(-1, 2).astype(np.int32)
         x, y, w, h = cv2.boundingRect(corners)
-        self.text_x = x
-        self.text_y = y
-        self.text_w = w
-        self.text_h = h
+
+        # labelに追加
+        frame = pd.DataFrame(
+            [[0, text, x, y, w, h]],
+            columns=["label", "text", "x", "y", "w", "h"],
+        )
+        self.label = pd.concat([self.label, frame])
 
         # 解像度を下げる(アスペクト比約3:2)
         self.img = cv2.resize(self.img, (192, 129))
         # ノイズを追加
         noise = np.random.normal(0, 3, (129, 192, 3))
         self.img = np.clip(self.img + noise, 0, 255).astype(np.uint8)
-        # テキストを囲う矩形領域を算出
         # 画像の保存
         cv2.imwrite(name, self.img)
 
@@ -125,34 +129,58 @@ class Stamped:
             text = self.__generate_text()
             name = TRAIN_PATH + "/images/" + str(i) + ".jpg"
             self.__draw_text(text, name)
-            # yoloのラベルファイルを生成
+
+        # labelのインデックスを振り直す
+        self.label = self.label.reset_index(drop=True)
+        # labelを正規化
+        scaler = MinMaxScaler()
+        self.label[["x", "y", "w", "h"]] = scaler.fit_transform(
+            self.label[["x", "y", "w", "h"]]
+        )
+
+        print(self.label.head())
+        # yoloのラベルファイルを生成
+        for i in range(train_num):
             with open(TRAIN_PATH + "/labels/" + str(i) + ".txt", "w") as f:
                 f.write(
                     "0 "
-                    + str(self.text_x)
+                    + str(self.label["x"][i])
                     + " "
-                    + str(self.text_y)
+                    + str(self.label["y"][i])
                     + " "
-                    + str(self.text_w)
+                    + str(self.label["w"][i])
                     + " "
-                    + str(self.text_h)
+                    + str(self.label["h"][i])
                 )
+
+        # labelファイルを初期化
+        self.label = pd.DataFrame(columns=["text", "x", "y", "w", "h"])
 
         for i in range(valid_num):
             text = self.__generate_text()
             name = VAILD_PATH + "/images/" + str(i) + ".jpg"
             self.__draw_text(text, name)
-            # yoloのラベルファイルを生成
+
+        # labelのインデックスを振り直す
+        self.label = self.label.reset_index(drop=True)
+        # labelを正規化
+        scaler = MinMaxScaler()
+        self.label[["x", "y", "w", "h"]] = scaler.fit_transform(
+            self.label[["x", "y", "w", "h"]]
+        )
+
+        # yoloのラベルファイルを生成
+        for i in range(valid_num):
             with open(VAILD_PATH + "/labels/" + str(i) + ".txt", "w") as f:
                 f.write(
                     "0 "
-                    + str(self.text_x)
+                    + str(self.label["x"][i])
                     + " "
-                    + str(self.text_y)
+                    + str(self.label["y"][i])
                     + " "
-                    + str(self.text_w)
+                    + str(self.label["w"][i])
                     + " "
-                    + str(self.text_h)
+                    + str(self.label["h"][i])
                 )
 
 
