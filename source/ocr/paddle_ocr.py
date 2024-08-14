@@ -5,13 +5,15 @@ from PIL import Image, ImageColor, ImageDraw
 ocr = PaddleOCR(lang="en")
 
 # 画像ファイルからテキストを抽出
-results = ocr.ocr("/home/kousei/image_proccessing/confidencial/binary.jpg")
+results = ocr.ocr(
+    "/home/kousei/image_proccessing/confidencial/binary_box2.jpg"
+)
 
 # 抽出したテキストを表示
 for line in results:
     print(line)
 
-target_path = "/home/kousei/image_proccessing/confidencial/binary.jpg"
+target_path = "/home/kousei/image_proccessing/confidencial/binary_box2.jpg"
 image = Image.open(target_path).convert("RGB")
 draw = ImageDraw.Draw(image)
 # バウンディングボックスを描画
