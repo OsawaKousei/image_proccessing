@@ -19,8 +19,8 @@ draw = ImageDraw.Draw(image)
 # バウンディングボックスを描画
 for result in results:
     print(result)
-    print(result[0])
-    print(result[0][0])
+    # print(result[0])
+    # print(result[0][0])
     p0 = result[0][0][0]
     p1 = result[0][0][1]
     p2 = result[0][0][2]
