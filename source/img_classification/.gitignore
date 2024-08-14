@@ -1,5 +1,0 @@
-data/hymenoptera_data/
-data/imagenet_class_index.json
-.ipynb_checkpoints
-*.pyc
-*.pth
