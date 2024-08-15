@@ -1,7 +1,7 @@
 # .pt
 *.pt
 
-*.txt
+source/*.txt
 *.jpg
 *.png
 
