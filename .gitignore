@@ -8,3 +8,5 @@ source/*.txt
 /confidential
 
 */data
+
+*.pth
