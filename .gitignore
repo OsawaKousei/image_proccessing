@@ -2,11 +2,14 @@
 *.pt
 
 source/*.txt
+source/object_detection/data/
 *.jpg
 *.png
 
 /confidential
 
 */data
+*/weights
 
 *.pth
+*.xml
