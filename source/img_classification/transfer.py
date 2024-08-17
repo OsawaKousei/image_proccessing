@@ -3,6 +3,7 @@ import glob
 import json
 import os.path as osp
 import random
+from typing import Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -160,7 +161,7 @@ class HymenopteraDataset(data.Dataset):
     def __init__(
         self,
         file_list: list,
-        transform: ImageTransform or None = None,
+        transform: ImageTransform | None = None,
         phase: str = "train",
     ) -> None:
         self.file_list = file_list  # ファイルパスのリスト
@@ -181,9 +182,10 @@ class HymenopteraDataset(data.Dataset):
         img = Image.open(img_path)  # [高さ][幅][色RGB]
 
         # 画像の前処理を実施
-        img_transformed = self.transform(
-            img, self.phase
-        )  # torch.Size([3, 224, 224])
+        if self.transform is not None:
+            img_transformed = self.transform(
+                img, self.phase
+            )  # torch.Size([3, 224, 224])
 
         # 画像のラベルをファイル名から抜き出す
         # 元の記述はディレクトリの移動に対応していないため変更
