@@ -144,6 +144,9 @@ COPY start.sh /start.sh
 RUN sudo chown ${USER_NAME}:${GROUP_NAME} /start.sh
 RUN sudo chmod +x /start.sh
 
+RUN git config --global user.name ${GIT_USER_NAME} &&\
+    git config --global user.email ${GIT_USER_EMAIL}
+
 # USER root
 CMD ["/start.sh"]
 
