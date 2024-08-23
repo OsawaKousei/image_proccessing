@@ -2,30 +2,43 @@
 第2章SSDで実装した内容をまとめたファイル
 """
 
-# パッケージのimport
-import torch.nn as nn
-import torch.nn.init as init
-import torch.nn.functional as F
-from torch.autograd import Function
-import torch.utils.data as data
-import torch
-import cv2
-import numpy as np
 import os.path as osp
-from itertools import product as product
-from math import sqrt as sqrt
 
 # XMLをファイルやテキストから読み込んだり、加工したり、保存したりするためのライブラリ
 import xml.etree.ElementTree as ET
+from itertools import product as product
+from math import sqrt as sqrt
+
+import cv2
+import numpy as np
+import torch
+
+# パッケージのimport
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.nn.init as init
+import torch.utils.data as data
+from torch.autograd import Function
 
 # フォルダ「utils」のdata_augumentation.pyからimport。入力画像の前処理をするクラス
-from utils.data_augumentation import Compose, ConvertFromInts, ToAbsoluteCoords, PhotometricDistort, Expand, RandomSampleCrop, RandomMirror, ToPercentCoords, Resize, SubtractMeans
+from utils.data_augumentation import (
+    Compose,
+    ConvertFromInts,
+    Expand,
+    PhotometricDistort,
+    RandomMirror,
+    RandomSampleCrop,
+    Resize,
+    SubtractMeans,
+    ToAbsoluteCoords,
+    ToPercentCoords,
+)
 
 # フォルダ「utils」にある関数matchを記述したmatch.pyからimport
 from utils.match import match
 
-
 # 学習、検証の画像データとアノテーションデータへのファイルパスリストを作成する
+
 
 def make_datapath_list(rootpath):
     """
@@ -43,12 +56,12 @@ def make_datapath_list(rootpath):
     """
 
     # 画像ファイルとアノテーションファイルへのパスのテンプレートを作成
-    imgpath_template = osp.join(rootpath, 'JPEGImages', '%s.jpg')
-    annopath_template = osp.join(rootpath, 'Annotations', '%s.xml')
+    imgpath_template = osp.join(rootpath, "JPEGImages", "%s.jpg")
+    annopath_template = osp.join(rootpath, "Annotations", "%s.xml")
 
     # 訓練と検証、それぞれのファイルのID（ファイル名）を取得する
-    train_id_names = osp.join(rootpath + 'ImageSets/Main/train.txt')
-    val_id_names = osp.join(rootpath + 'ImageSets/Main/val.txt')
+    train_id_names = osp.join(rootpath + "ImageSets/Main/train.txt")
+    val_id_names = osp.join(rootpath + "ImageSets/Main/val.txt")
 
     # 訓練データの画像ファイルとアノテーションファイルへのパスリストを作成
     train_img_list = list()
@@ -56,8 +69,8 @@ def make_datapath_list(rootpath):
 
     for line in open(train_id_names):
         file_id = line.strip()  # 空白スペースと改行を除去
-        img_path = (imgpath_template % file_id)  # 画像のパス
-        anno_path = (annopath_template % file_id)  # アノテーションのパス
+        img_path = imgpath_template % file_id  # 画像のパス
+        anno_path = annopath_template % file_id  # アノテーションのパス
         train_img_list.append(img_path)  # リストに追加
         train_anno_list.append(anno_path)  # リストに追加
 
@@ -67,8 +80,8 @@ def make_datapath_list(rootpath):
 
     for line in open(val_id_names):
         file_id = line.strip()  # 空白スペースと改行を除去
-        img_path = (imgpath_template % file_id)  # 画像のパス
-        anno_path = (annopath_template % file_id)  # アノテーションのパス
+        img_path = imgpath_template % file_id  # 画像のパス
+        anno_path = annopath_template % file_id  # アノテーションのパス
         val_img_list.append(img_path)  # リストに追加
         val_anno_list.append(anno_path)  # リストに追加
 
@@ -118,28 +131,28 @@ class Anno_xml2list(object):
         xml = ET.parse(xml_path).getroot()
 
         # 画像内にある物体（object）の数だけループする
-        for obj in xml.iter('object'):
+        for obj in xml.iter("object"):
 
             # アノテーションで検知がdifficultに設定されているものは除外
-            difficult = int(obj.find('difficult').text)
+            difficult = int(obj.find("difficult").text)
             if difficult == 1:
                 continue
 
             # 1つの物体に対するアノテーションを格納するリスト
             bndbox = []
 
-            name = obj.find('name').text.lower().strip()  # 物体名
-            bbox = obj.find('bndbox')  # バウンディングボックスの情報
+            name = obj.find("name").text.lower().strip()  # 物体名
+            bbox = obj.find("bndbox")  # バウンディングボックスの情報
 
             # アノテーションの xmin, ymin, xmax, ymaxを取得し、0～1に規格化
-            pts = ['xmin', 'ymin', 'xmax', 'ymax']
+            pts = ["xmin", "ymin", "xmax", "ymax"]
 
-            for pt in (pts):
+            for pt in pts:
                 # VOCは原点が(1,1)なので1を引き算して（0, 0）に
                 cur_pixel = int(bbox.find(pt).text) - 1
 
                 # 幅、高さで規格化
-                if pt == 'xmin' or pt == 'xmax':  # x方向のときは幅で割算
+                if pt == "xmin" or pt == "xmax":  # x方向のときは幅で割算
                     cur_pixel /= width
                 else:  # y方向のときは高さで割算
                     cur_pixel /= height
@@ -159,7 +172,7 @@ class Anno_xml2list(object):
 # 入力画像の前処理をするクラス
 
 
-class DataTransform():
+class DataTransform:
     """
     画像とアノテーションの前処理クラス。訓練と推論で異なる動作をする。
     画像のサイズを300x300にする。
@@ -176,22 +189,30 @@ class DataTransform():
 
     def __init__(self, input_size, color_mean):
         self.data_transform = {
-            'train': Compose([
-                ConvertFromInts(),  # intをfloat32に変換
-                ToAbsoluteCoords(),  # アノテーションデータの規格化を戻す
-                PhotometricDistort(),  # 画像の色調などをランダムに変化
-                Expand(color_mean),  # 画像のキャンバスを広げる
-                RandomSampleCrop(),  # 画像内の部分をランダムに抜き出す
-                RandomMirror(),  # 画像を反転させる
-                ToPercentCoords(),  # アノテーションデータを0-1に規格化
-                Resize(input_size),  # 画像サイズをinput_size×input_sizeに変形
-                SubtractMeans(color_mean)  # BGRの色の平均値を引き算
-            ]),
-            'val': Compose([
-                ConvertFromInts(),  # intをfloatに変換
-                Resize(input_size),  # 画像サイズをinput_size×input_sizeに変形
-                SubtractMeans(color_mean)  # BGRの色の平均値を引き算
-            ])
+            "train": Compose(
+                [
+                    ConvertFromInts(),  # intをfloat32に変換
+                    ToAbsoluteCoords(),  # アノテーションデータの規格化を戻す
+                    PhotometricDistort(),  # 画像の色調などをランダムに変化
+                    Expand(color_mean),  # 画像のキャンバスを広げる
+                    RandomSampleCrop(),  # 画像内の部分をランダムに抜き出す
+                    RandomMirror(),  # 画像を反転させる
+                    ToPercentCoords(),  # アノテーションデータを0-1に規格化
+                    Resize(
+                        input_size
+                    ),  # 画像サイズをinput_size×input_sizeに変形
+                    SubtractMeans(color_mean),  # BGRの色の平均値を引き算
+                ]
+            ),
+            "val": Compose(
+                [
+                    ConvertFromInts(),  # intをfloatに変換
+                    Resize(
+                        input_size
+                    ),  # 画像サイズをinput_size×input_sizeに変形
+                    SubtractMeans(color_mean),  # BGRの色の平均値を引き算
+                ]
+            ),
         }
 
     def __call__(self, img, phase, boxes, labels):
@@ -227,21 +248,23 @@ class VOCDataset(data.Dataset):
         self.anno_list = anno_list
         self.phase = phase  # train もしくは valを指定
         self.transform = transform  # 画像の変形
-        self.transform_anno = transform_anno  # アノテーションデータをxmlからリストへ
+        self.transform_anno = (
+            transform_anno  # アノテーションデータをxmlからリストへ
+        )
 
     def __len__(self):
-        '''画像の枚数を返す'''
+        """画像の枚数を返す"""
         return len(self.img_list)
 
     def __getitem__(self, index):
-        '''
+        """
         前処理をした画像のテンソル形式のデータとアノテーションを取得
-        '''
+        """
         im, gt, h, w = self.pull_item(index)
         return im, gt
 
     def pull_item(self, index):
-        '''前処理をした画像のテンソル形式のデータ、アノテーション、画像の高さ、幅を取得する'''
+        """前処理をした画像のテンソル形式のデータ、アノテーション、画像の高さ、幅を取得する"""
 
         # 1. 画像読み込み
         image_file_path = self.img_list[index]
@@ -254,7 +277,8 @@ class VOCDataset(data.Dataset):
 
         # 3. 前処理を実施
         img, boxes, labels = self.transform(
-            img, self.phase, anno_list[:, :4], anno_list[:, 4])
+            img, self.phase, anno_list[:, :4], anno_list[:, 4]
+        )
 
         # 色チャネルの順番がBGRになっているので、RGBに順番変更
         # さらに（高さ、幅、色チャネル）の順を（色チャネル、高さ、幅）に変換
@@ -281,7 +305,9 @@ def od_collate_fn(batch):
     imgs = []
     for sample in batch:
         imgs.append(sample[0])  # sample[0] は画像imgです
-        targets.append(torch.FloatTensor(sample[1]))  # sample[1] はアノテーションgtです
+        targets.append(
+            torch.FloatTensor(sample[1])
+        )  # sample[1] はアノテーションgtです
 
     # imgsはミニバッチサイズのリストになっています
     # リストの要素はtorch.Size([3, 300, 300])です。
@@ -303,13 +329,30 @@ def make_vgg():
     in_channels = 3  # 色チャネル数
 
     # vggモジュールで使用する畳み込み層やマックスプーリングのチャネル数
-    cfg = [64, 64, 'M', 128, 128, 'M', 256, 256,
-           256, 'MC', 512, 512, 512, 'M', 512, 512, 512]
+    cfg = [
+        64,
+        64,
+        "M",
+        128,
+        128,
+        "M",
+        256,
+        256,
+        256,
+        "MC",
+        512,
+        512,
+        512,
+        "M",
+        512,
+        512,
+        512,
+    ]
 
     for v in cfg:
-        if v == 'M':
+        if v == "M":
             layers += [nn.MaxPool2d(kernel_size=2, stride=2)]
-        elif v == 'MC':
+        elif v == "MC":
             # ceilは出力サイズを、計算結果（float）に対して、切り上げで整数にするモード
             # デフォルトでは出力サイズを計算結果（float）に対して、切り下げで整数にするfloorモード
             layers += [nn.MaxPool2d(kernel_size=2, stride=2, ceil_mode=True)]
@@ -321,15 +364,22 @@ def make_vgg():
     pool5 = nn.MaxPool2d(kernel_size=3, stride=1, padding=1)
     conv6 = nn.Conv2d(512, 1024, kernel_size=3, padding=6, dilation=6)
     conv7 = nn.Conv2d(1024, 1024, kernel_size=1)
-    layers += [pool5, conv6,
-               nn.ReLU(inplace=True), conv7, nn.ReLU(inplace=True)]
+    layers += [
+        pool5,
+        conv6,
+        nn.ReLU(inplace=True),
+        conv7,
+        nn.ReLU(inplace=True),
+    ]
     return nn.ModuleList(layers)
 
 
 # 8層にわたる、extrasモジュールを作成
 def make_extras():
     layers = []
-    in_channels = 1024  # vggモジュールから出力された、extraに入力される画像チャネル数
+    in_channels = (
+        1024  # vggモジュールから出力された、extraに入力される画像チャネル数
+    )
 
     # extraモジュールの畳み込み層のチャネル数を設定するコンフィギュレーション
     cfg = [256, 512, 128, 256, 128, 256, 128, 256]
@@ -356,40 +406,64 @@ def make_loc_conf(num_classes=21, bbox_aspect_num=[4, 6, 6, 6, 4, 4]):
     conf_layers = []
 
     # VGGの22層目、conv4_3（source1）に対する畳み込み層
-    loc_layers += [nn.Conv2d(512, bbox_aspect_num[0]
-                             * 4, kernel_size=3, padding=1)]
-    conf_layers += [nn.Conv2d(512, bbox_aspect_num[0]
-                              * num_classes, kernel_size=3, padding=1)]
+    loc_layers += [
+        nn.Conv2d(512, bbox_aspect_num[0] * 4, kernel_size=3, padding=1)
+    ]
+    conf_layers += [
+        nn.Conv2d(
+            512, bbox_aspect_num[0] * num_classes, kernel_size=3, padding=1
+        )
+    ]
 
     # VGGの最終層（source2）に対する畳み込み層
-    loc_layers += [nn.Conv2d(1024, bbox_aspect_num[1]
-                             * 4, kernel_size=3, padding=1)]
-    conf_layers += [nn.Conv2d(1024, bbox_aspect_num[1]
-                              * num_classes, kernel_size=3, padding=1)]
+    loc_layers += [
+        nn.Conv2d(1024, bbox_aspect_num[1] * 4, kernel_size=3, padding=1)
+    ]
+    conf_layers += [
+        nn.Conv2d(
+            1024, bbox_aspect_num[1] * num_classes, kernel_size=3, padding=1
+        )
+    ]
 
     # extraの（source3）に対する畳み込み層
-    loc_layers += [nn.Conv2d(512, bbox_aspect_num[2]
-                             * 4, kernel_size=3, padding=1)]
-    conf_layers += [nn.Conv2d(512, bbox_aspect_num[2]
-                              * num_classes, kernel_size=3, padding=1)]
+    loc_layers += [
+        nn.Conv2d(512, bbox_aspect_num[2] * 4, kernel_size=3, padding=1)
+    ]
+    conf_layers += [
+        nn.Conv2d(
+            512, bbox_aspect_num[2] * num_classes, kernel_size=3, padding=1
+        )
+    ]
 
     # extraの（source4）に対する畳み込み層
-    loc_layers += [nn.Conv2d(256, bbox_aspect_num[3]
-                             * 4, kernel_size=3, padding=1)]
-    conf_layers += [nn.Conv2d(256, bbox_aspect_num[3]
-                              * num_classes, kernel_size=3, padding=1)]
+    loc_layers += [
+        nn.Conv2d(256, bbox_aspect_num[3] * 4, kernel_size=3, padding=1)
+    ]
+    conf_layers += [
+        nn.Conv2d(
+            256, bbox_aspect_num[3] * num_classes, kernel_size=3, padding=1
+        )
+    ]
 
     # extraの（source5）に対する畳み込み層
-    loc_layers += [nn.Conv2d(256, bbox_aspect_num[4]
-                             * 4, kernel_size=3, padding=1)]
-    conf_layers += [nn.Conv2d(256, bbox_aspect_num[4]
-                              * num_classes, kernel_size=3, padding=1)]
+    loc_layers += [
+        nn.Conv2d(256, bbox_aspect_num[4] * 4, kernel_size=3, padding=1)
+    ]
+    conf_layers += [
+        nn.Conv2d(
+            256, bbox_aspect_num[4] * num_classes, kernel_size=3, padding=1
+        )
+    ]
 
     # extraの（source6）に対する畳み込み層
-    loc_layers += [nn.Conv2d(256, bbox_aspect_num[5]
-                             * 4, kernel_size=3, padding=1)]
-    conf_layers += [nn.Conv2d(256, bbox_aspect_num[5]
-                              * num_classes, kernel_size=3, padding=1)]
+    loc_layers += [
+        nn.Conv2d(256, bbox_aspect_num[5] * 4, kernel_size=3, padding=1)
+    ]
+    conf_layers += [
+        nn.Conv2d(
+            256, bbox_aspect_num[5] * num_classes, kernel_size=3, padding=1
+        )
+    ]
 
     return nn.ModuleList(loc_layers), nn.ModuleList(conf_layers)
 
@@ -404,24 +478,27 @@ class L2Norm(nn.Module):
         self.eps = 1e-10
 
     def reset_parameters(self):
-        '''結合パラメータを大きさscaleの値にする初期化を実行'''
-        init.constant_(self.weight, self.scale)  # weightの値がすべてscale（=20）になる
+        """結合パラメータを大きさscaleの値にする初期化を実行"""
+        init.constant_(
+            self.weight, self.scale
+        )  # weightの値がすべてscale（=20）になる
 
     def forward(self, x):
-        '''38×38の特徴量に対して、512チャネルにわたって2乗和のルートを求めた
-        38×38個の値を使用し、各特徴量を正規化してから係数をかけ算する層'''
+        """38×38の特徴量に対して、512チャネルにわたって2乗和のルートを求めた
+        38×38個の値を使用し、各特徴量を正規化してから係数をかけ算する層"""
 
         # 各チャネルにおける38×38個の特徴量のチャネル方向の2乗和を計算し、
         # さらにルートを求め、割り算して正規化する
         # normのテンソルサイズはtorch.Size([batch_num, 1, 38, 38])になります
-        norm = x.pow(2).sum(dim=1, keepdim=True).sqrt()+self.eps
+        norm = x.pow(2).sum(dim=1, keepdim=True).sqrt() + self.eps
         x = torch.div(x, norm)
 
         # 係数をかける。係数はチャネルごとに1つで、512個の係数を持つ
         # self.weightのテンソルサイズはtorch.Size([512])なので
         # torch.Size([batch_num, 512, 38, 38])まで変形します
-        weights = self.weight.unsqueeze(
-            0).unsqueeze(2).unsqueeze(3).expand_as(x)
+        weights = (
+            self.weight.unsqueeze(0).unsqueeze(2).unsqueeze(3).expand_as(x)
+        )
         out = weights * x
 
         return out
@@ -433,26 +510,28 @@ class DBox(object):
         super(DBox, self).__init__()
 
         # 初期設定
-        self.image_size = cfg['input_size']  # 画像サイズの300
+        self.image_size = cfg["input_size"]  # 画像サイズの300
         # [38, 19, …] 各sourceの特徴量マップのサイズ
-        self.feature_maps = cfg['feature_maps']
+        self.feature_maps = cfg["feature_maps"]
         self.num_priors = len(cfg["feature_maps"])  # sourceの個数=6
-        self.steps = cfg['steps']  # [8, 16, …] DBoxのピクセルサイズ
+        self.steps = cfg["steps"]  # [8, 16, …] DBoxのピクセルサイズ
 
-        self.min_sizes = cfg['min_sizes']
+        self.min_sizes = cfg["min_sizes"]
         # [30, 60, …] 小さい正方形のDBoxのピクセルサイズ(正確には面積)
 
-        self.max_sizes = cfg['max_sizes']
+        self.max_sizes = cfg["max_sizes"]
         # [60, 111, …] 大きい正方形のDBoxのピクセルサイズ(正確には面積)
 
-        self.aspect_ratios = cfg['aspect_ratios']  # 長方形のDBoxのアスペクト比
+        self.aspect_ratios = cfg["aspect_ratios"]  # 長方形のDBoxのアスペクト比
 
     def make_dbox_list(self):
-        '''DBoxを作成する'''
+        """DBoxを作成する"""
         mean = []
         # 'feature_maps': [38, 19, 10, 5, 3, 1]
         for k, f in enumerate(self.feature_maps):
-            for i, j in product(range(f), repeat=2):  # fまでの数で2ペアの組み合わせを作る　f_P_2 個
+            for i, j in product(
+                range(f), repeat=2
+            ):  # fまでの数で2ペアの組み合わせを作る　f_P_2 個
                 # 特徴量の画像サイズ
                 # 300 / 'steps': [8, 16, 32, 64, 100, 300],
                 f_k = self.image_size / self.steps[k]
@@ -463,18 +542,18 @@ class DBox(object):
 
                 # アスペクト比1の小さいDBox [cx,cy, width, height]
                 # 'min_sizes': [30, 60, 111, 162, 213, 264]
-                s_k = self.min_sizes[k]/self.image_size
+                s_k = self.min_sizes[k] / self.image_size
                 mean += [cx, cy, s_k, s_k]
 
                 # アスペクト比1の大きいDBox [cx,cy, width, height]
                 # 'max_sizes': [60, 111, 162, 213, 264, 315],
-                s_k_prime = sqrt(s_k * (self.max_sizes[k]/self.image_size))
+                s_k_prime = sqrt(s_k * (self.max_sizes[k] / self.image_size))
                 mean += [cx, cy, s_k_prime, s_k_prime]
 
                 # その他のアスペクト比のdefBox [cx,cy, width, height]
                 for ar in self.aspect_ratios[k]:
-                    mean += [cx, cy, s_k*sqrt(ar), s_k/sqrt(ar)]
-                    mean += [cx, cy, s_k/sqrt(ar), s_k*sqrt(ar)]
+                    mean += [cx, cy, s_k * sqrt(ar), s_k / sqrt(ar)]
+                    mean += [cx, cy, s_k / sqrt(ar), s_k * sqrt(ar)]
 
         # DBoxをテンソルに変換 torch.Size([8732, 4])
         output = torch.Tensor(mean).view(-1, 4)
@@ -507,9 +586,13 @@ def decode(loc, dbox_list):
     # locも[Δcx, Δcy, Δwidth, Δheight]で格納されている
 
     # オフセット情報からBBoxを求める
-    boxes = torch.cat((
-        dbox_list[:, :2] + loc[:, :2] * 0.1 * dbox_list[:, 2:],
-        dbox_list[:, 2:] * torch.exp(loc[:, 2:] * 0.2)), dim=1)
+    boxes = torch.cat(
+        (
+            dbox_list[:, :2] + loc[:, :2] * 0.1 * dbox_list[:, 2:],
+            dbox_list[:, 2:] * torch.exp(loc[:, 2:] * 0.2),
+        ),
+        dim=1,
+    )
     # boxesのサイズはtorch.Size([8732, 4])となります
 
     # BBoxの座標情報を[cx, cy, width, height]から[xmin, ymin, xmax, ymax] に
@@ -517,6 +600,7 @@ def decode(loc, dbox_list):
     boxes[:, 2:] += boxes[:, :2]  # 座標(xmax,ymax)へ変換
 
     return boxes
+
 
 # Non-Maximum Suppressionを行う関数
 
@@ -611,15 +695,17 @@ def nm_suppression(boxes, scores, overlap=0.45, top_k=200):
         tmp_h = torch.clamp(tmp_h, min=0.0)
 
         # clampされた状態での面積を求める
-        inter = tmp_w*tmp_h
+        inter = tmp_w * tmp_h
 
         # IoU = intersect部分 / (area(a) + area(b) - intersect部分)の計算
         rem_areas = torch.index_select(area, 0, idx)  # 各BBoxの元の面積
         union = (rem_areas - inter) + area[i]  # 2つのエリアのANDの面積
-        IoU = inter/union
+        IoU = inter / union
 
         # IoUがoverlapより小さいidxのみを残す
-        idx = idx[IoU.le(overlap)]  # leはLess than or Equal toの処理をする演算です
+        idx = idx[
+            IoU.le(overlap)
+        ]  # leはLess than or Equal toの処理をする演算です
         # IoUがoverlapより大きいidxは、最初に選んでkeepに格納したidxと同じ物体に対してBBoxを囲んでいるため消去
 
     # whileのループが抜けたら終了
@@ -633,12 +719,16 @@ def nm_suppression(boxes, scores, overlap=0.45, top_k=200):
 class Detect(Function):
 
     def __init__(self, conf_thresh=0.01, top_k=200, nms_thresh=0.45):
-        self.softmax = nn.Softmax(dim=-1)  # confをソフトマックス関数で正規化するために用意
-        self.conf_thresh = conf_thresh  # confがconf_thresh=0.01より高いDBoxのみを扱う
+        self.softmax = nn.Softmax(
+            dim=-1
+        )  # confをソフトマックス関数で正規化するために用意
+        self.conf_thresh = (
+            conf_thresh  # confがconf_thresh=0.01より高いDBoxのみを扱う
+        )
         self.top_k = top_k  # nm_supressionでconfの高いtop_k個を計算に使用する, top_k = 200
         self.nms_thresh = nms_thresh  # nm_supressionでIOUがnms_thresh=0.45より大きいと、同一物体へのBBoxとみなす
 
-    def forward(self, loc_data, conf_data, dbox_list):
+    def __call__(self, loc_data, conf_data, dbox_list):
         """
         順伝搬の計算を実行する。
 
@@ -709,15 +799,18 @@ class Detect(Function):
 
                 # 3. Non-Maximum Suppressionを実施し、被っているBBoxを取り除く
                 ids, count = nm_suppression(
-                    boxes, scores, self.nms_thresh, self.top_k)
+                    boxes, scores, self.nms_thresh, self.top_k
+                )
                 # ids：confの降順にNon-Maximum Suppressionを通過したindexが格納
                 # count：Non-Maximum Suppressionを通過したBBoxの数
 
                 # outputにNon-Maximum Suppressionを抜けた結果を格納
-                output[i, cl, :count] = torch.cat((scores[ids[:count]].unsqueeze(1),
-                                                   boxes[ids[:count]]), 1)
+                output[i, cl, :count] = torch.cat(
+                    (scores[ids[:count]].unsqueeze(1), boxes[ids[:count]]), 1
+                )
 
         return output  # torch.Size([1, 21, 200, 5])
+
 
 # SSDクラスを作成する
 
@@ -735,14 +828,15 @@ class SSD(nn.Module):
         self.extras = make_extras()
         self.L2Norm = L2Norm()
         self.loc, self.conf = make_loc_conf(
-            cfg["num_classes"], cfg["bbox_aspect_num"])
+            cfg["num_classes"], cfg["bbox_aspect_num"]
+        )
 
         # DBox作成
         dbox = DBox(cfg)
         self.dbox_list = dbox.make_dbox_list()
 
         # 推論時はクラス「Detect」を用意します
-        if phase == 'inference':
+        if phase == "inference":
             self.detect = Detect()
 
     def forward(self, x):
@@ -774,7 +868,7 @@ class SSD(nn.Module):
         # source1～6に、それぞれ対応する畳み込みを1回ずつ適用する
         # zipでforループの複数のリストの要素を取得
         # source1～6まであるので、6回ループが回る
-        for (x, l, c) in zip(sources, self.loc, self.conf):
+        for x, l, c in zip(sources, self.loc, self.conf):
             # Permuteは要素の順番を入れ替え
             loc.append(l(x).permute(0, 2, 3, 1).contiguous())
             conf.append(c(x).permute(0, 2, 3, 1).contiguous())
@@ -806,7 +900,8 @@ class SSD(nn.Module):
         if self.phase == "inference":  # 推論時
             # クラス「Detect」のforwardを実行
             # 返り値のサイズは torch.Size([batch_num, 21, 200, 5])
-            return self.detect(output[0], output[1], output[2])
+            with torch.no_grad():
+                return self.detect(output[0], output[1], output[2])
 
         else:  # 学習時
             return output
@@ -816,9 +911,11 @@ class SSD(nn.Module):
 class MultiBoxLoss(nn.Module):
     """SSDの損失関数のクラスです。"""
 
-    def __init__(self, jaccard_thresh=0.5, neg_pos=3, device='cpu'):
+    def __init__(self, jaccard_thresh=0.5, neg_pos=3, device="cpu"):
         super(MultiBoxLoss, self).__init__()
-        self.jaccard_thresh = jaccard_thresh  # 0.5 関数matchのjaccard係数の閾値
+        self.jaccard_thresh = (
+            jaccard_thresh  # 0.5 関数matchのjaccard係数の閾値
+        )
         self.negpos_ratio = neg_pos  # 3:1 Hard Negative Miningの負と正の比率
         self.device = device  # CPUとGPUのいずれで計算するのか
 
@@ -877,8 +974,16 @@ class MultiBoxLoss(nn.Module):
             # 正解BBoxのラベルconf_t_labelは背景クラスの0とする
             variance = [0.1, 0.2]
             # このvarianceはDBoxからBBoxに補正計算する際に使用する式の係数です
-            match(self.jaccard_thresh, truths, dbox,
-                  variance, labels, loc_t, conf_t_label, idx)
+            match(
+                self.jaccard_thresh,
+                truths,
+                dbox,
+                variance,
+                labels,
+                loc_t,
+                conf_t_label,
+                idx,
+            )
 
         # ----------
         # 位置の損失：loss_lを計算
@@ -895,7 +1000,7 @@ class MultiBoxLoss(nn.Module):
         loc_t = loc_t[pos_idx].view(-1, 4)
 
         # 物体を発見したPositive DBoxのオフセット情報loc_tの損失（誤差）を計算
-        loss_l = F.smooth_l1_loss(loc_p, loc_t, reduction='sum')
+        loss_l = F.smooth_l1_loss(loc_p, loc_t, reduction="sum")
 
         # ----------
         # クラス予測の損失：loss_cを計算
@@ -907,7 +1012,8 @@ class MultiBoxLoss(nn.Module):
 
         # クラス予測の損失を関数を計算(reduction='none'にして、和をとらず、次元をつぶさない)
         loss_c = F.cross_entropy(
-            batch_conf, conf_t_label.view(-1), reduction='none')
+            batch_conf, conf_t_label.view(-1), reduction="none"
+        )
 
         # -----------------
         # これからNegative DBoxのうち、Hard Negative Miningで抽出するものを求めるマスクを作成します
@@ -915,7 +1021,9 @@ class MultiBoxLoss(nn.Module):
 
         # 物体発見したPositive DBoxの損失を0にする
         # （注意）物体はlabelが1以上になっている。ラベル0は背景。
-        num_pos = pos_mask.long().sum(1, keepdim=True)  # ミニバッチごとの物体クラス予測の数
+        num_pos = pos_mask.long().sum(
+            1, keepdim=True
+        )  # ミニバッチごとの物体クラス予測の数
         loss_c = loss_c.view(num_batch, -1)  # torch.Size([num_batch, 8732])
         loss_c[pos_mask] = 0  # 物体を発見したDBoxは損失0とする
 
@@ -945,7 +1053,7 @@ class MultiBoxLoss(nn.Module):
         # 背景のDBoxの数num_negを決める。HardNegative Miningにより、
         # 物体発見のDBoxの数num_posの3倍（self.negpos_ratio倍）とする。
         # ただし、万が一、DBoxの数を超える場合は、DBoxの数を上限とする
-        num_neg = torch.clamp(num_pos*self.negpos_ratio, max=num_dbox)
+        num_neg = torch.clamp(num_pos * self.negpos_ratio, max=num_dbox)
 
         # idx_rankは各DBoxの損失の大きさが上から何番目なのかが入っている
         # 背景のDBoxの数num_negよりも、順位が低い（すなわち損失が大きい）DBoxを取るマスク作成
@@ -964,18 +1072,19 @@ class MultiBoxLoss(nn.Module):
         neg_idx_mask = neg_mask.unsqueeze(2).expand_as(conf_data)
 
         # conf_dataからposとnegだけを取り出してconf_hnmにする。形はtorch.Size([num_pos+num_neg, 21])
-        conf_hnm = conf_data[(pos_idx_mask+neg_idx_mask).gt(0)
-                             ].view(-1, num_classes)
+        conf_hnm = conf_data[(pos_idx_mask + neg_idx_mask).gt(0)].view(
+            -1, num_classes
+        )
         # （注釈）gtは greater than (>)の略称。これでmaskが1のindexを取り出す。
         # pos_idx_mask+neg_idx_maskは足し算だが、indexへのmaskをまとめているだけである。
         # つまり、posであろうがnegであろうが、マスクが1のものを足し算で一つのリストにし、それをgtで取得
 
         # 同様に教師データであるconf_t_labelからposとnegだけを取り出してconf_t_label_hnmに
         # 形はtorch.Size([pos+neg])になる
-        conf_t_label_hnm = conf_t_label[(pos_mask+neg_mask).gt(0)]
+        conf_t_label_hnm = conf_t_label[(pos_mask + neg_mask).gt(0)]
 
         # confidenceの損失関数を計算（要素の合計=sumを求める）
-        loss_c = F.cross_entropy(conf_hnm, conf_t_label_hnm, reduction='sum')
+        loss_c = F.cross_entropy(conf_hnm, conf_t_label_hnm, reduction="sum")
 
         # 物体を発見したBBoxの数N（全ミニバッチの合計）で損失を割り算
         N = num_pos.sum()
