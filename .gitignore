@@ -3,6 +3,7 @@
 
 source/*.txt
 source/object_detection/data/
+source/semantic_segmentation/data/
 *.jpg
 *.png
 
