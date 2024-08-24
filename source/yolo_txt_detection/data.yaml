@@ -1,0 +1,7 @@
+# yamlファイルから各画像フォルダまでの相対パス(相対パスで上手くいかない時は絶対パスにする)
+train: /home/kousei/image_proccessing/source/ocr/train/images/
+val: /home/kousei/image_proccessing/source/ocr/valid/images/
+
+# データセットが含むクラス
+nc: 1 # クラス数
+names: ["text"] # クラス名の配列。複数クラスならば`classes.txt`に書かれている順番にする

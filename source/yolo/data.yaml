@@ -1,6 +1,6 @@
 # yamlファイルから各画像フォルダまでの相対パス(相対パスで上手くいかない時は絶対パスにする)
 train: /home/kousei/image_proccessing/source/yolo/train/images/
-val: /home/kousei/image_proccessing/source/yolo/valid/images
+val: /home/kousei/image_proccessing/source/yolo/valid/images/
 
 # データセットが含むクラス
 nc: 1 # クラス数

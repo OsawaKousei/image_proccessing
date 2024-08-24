@@ -16,6 +16,7 @@ services:
         - PYTHON_VERSION=${PYTHON_VERSION}
         - CUDA_VERSION=${CUDA_VERSION}
       dockerfile: Dockerfile
+    shm_size: '2gb'
     image: n622jwith/image_processing:latest
     # ホストの22番ポートは使用できないので、10000番ポートを使用する(22にアクセスするとkey errorが発生する)
     ports:
